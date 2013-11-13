@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Room</string>
+    <string name="action_settings">Settings</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="title_activity_wall">WallActivity</string>
+    <string name="title_activity_upload_photo">UploadPhotoActivity</string>
+    <string name="title_activity_take_photo">TakePhotoActivity</string>
+    <string name="wall_description">Your wall</string>
+    
+    <!-- Arrays -->
+    <string-array name="edit_tag_options">
+        <item>Edit name</item>
+        <item>Edit data</item>
+        <item>Move</item>
+        <item>Delete</item>
+        <item>Change size</item>
+    </string-array>
+
+</resources>
