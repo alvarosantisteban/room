@@ -5,11 +5,22 @@
     android:layout_height="match_parent"
     tools:context=".WallActivity" >
     
+    
     <com.alvarosantisteban.room.TaggeableImageView 
         android:id="@+id/wallImage"
         android:layout_width="wrap_content"
    		android:layout_height="wrap_content"
    		android:contentDescription="@string/wall_description"
+        />
+    
+    <Switch 
+        android:id="@+id/editModeSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        android:textOn="Edit"
+        android:textOff="Tag"
+        
         />
 	<!-- 
     <ListView
@@ -23,10 +34,10 @@
     </ListView>
 	 -->
 	 <ListView 
-    android:id="@+id/editTagOptionsList"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:visibility="invisible"  
-    android:entries="@array/edit_tag_options"/> 
+	    android:id="@+id/editTagOptionsList"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:visibility="invisible"  
+	    android:entries="@array/edit_tag_options"/> 
 
 </RelativeLayout>

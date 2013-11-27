@@ -9,6 +9,12 @@
     <string name="title_activity_take_photo">TakePhotoActivity</string>
     <string name="wall_description">Your wall</string>
     
+    <!-- Popup -->
+    <string name="change_name_popup">Write the name of the tag</string>
+    <string name="dialog_title">Change name</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    
     <!-- Arrays -->
     <string-array name="edit_tag_options">
         <item>Edit name</item>

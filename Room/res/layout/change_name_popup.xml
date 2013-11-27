@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+   android:id="@+id/popup"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:orientation="vertical" >
+ 
+	<TextView
+	   android:id="@+id/changeNameDescription"
+	   android:layout_width="wrap_content"
+	   android:layout_height="wrap_content"
+	   android:text="@string/change_name_popup"
+	   android:textAppearance="?android:attr/textAppearanceLarge" />
+	 
+	<EditText
+	    android:id="@+id/editText"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:inputType="text"/>
+</LinearLayout>

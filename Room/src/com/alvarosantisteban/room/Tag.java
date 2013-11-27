@@ -48,4 +48,8 @@ public class Tag {
 		// Update the rect
 		rect.set(center.x-distance, center.y-distance, center.x+distance, center.y+distance);
 	}
+	
+	public void setName(String newName){
+		name = newName;
+	}
 }

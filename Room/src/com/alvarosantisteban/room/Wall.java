@@ -49,4 +49,8 @@ public class Wall {
 		}
 		tags.add(tag);
 	}
+	
+	public void removeTag(Tag tag){
+		tags.remove(tag);
+	}
 }

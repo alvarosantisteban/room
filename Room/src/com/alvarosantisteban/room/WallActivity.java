@@ -3,7 +3,9 @@ package com.alvarosantisteban.room;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Iterator;
+
 import android.app.Activity;
+import android.app.DialogFragment;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -17,9 +19,15 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnTouchListener;
 import android.widget.Adapter;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.CompoundButton;
+import android.widget.CompoundButton.OnCheckedChangeListener;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.Switch;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -30,7 +38,7 @@ import com.google.gson.reflect.TypeToken;
  * @author Alvaro Santisteban 2013 - alvarosantisteban@gmail.com
  *
  */
-public class WallActivity extends Activity {
+public class WallActivity extends Activity implements NoticeDialogFragment.NoticeDialogListener{
 	
 	/**
 	 * Used for logging purposes
@@ -44,6 +52,8 @@ public class WallActivity extends Activity {
 	private static SharedPreferences prefs;
 	// Access the preference for the Wall
 	static String WALL_PREFERENCES = "aWall";
+	// Access the preferences for the tag mode
+	static String TAG_MODE_PREFERENCES = "tagMode";
 	
 	// Used to store a Wall object as json string
 	private static Gson GSON = new Gson();
@@ -56,22 +66,42 @@ public class WallActivity extends Activity {
 	static Uri imageUri;
 	ImageView wallImage;
 	
+	Context context;
+	
 	/**
 	 * The ListView with the actions that the user can do regarding a Tag
 	 */
 	ListView editTagOptionsList;
+	
+	Switch editTagsSwitch;
+	/*
+	 * if true, user can edit tags, 
+	 * if false, user can add new tags
+	 */
+	private boolean editTagsMode;
+
+	/**
+	 * A reference to the last touched tag by the user
+	 */
+	protected Tag lastTouchedTag;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_wall);
 		Log.d(TAG, "onCreate");
+		context = this;
 		
 		wallImage = (TaggeableImageView) findViewById(R.id.wallImage);
 		editTagOptionsList = (ListView) findViewById(R.id.editTagOptionsList);
+		editTagsSwitch = (Switch) findViewById(R.id.editModeSwitch);
 		
 		// Get the preferences to load and save the tags
 		prefs = getBaseContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+		editTagsMode = editTagsSwitch.isChecked();
+		
+		editTagsSwitch.setOnCheckedChangeListener(checkListener);
 		
 		/*
 		 * To delete everything in the SharedPreferences
@@ -99,6 +129,7 @@ public class WallActivity extends Activity {
 	    //editTagOptionsList.getLayoutParams().width = getWidestView(this, adapter);
 		
 	    editTagOptionsList.getLayoutParams().width = 240;
+		editTagOptionsList.setOnItemClickListener(listItemListener);
 		
 	    // Get the intent from the main activity to obtain the URI of the image
 		Intent intent = getIntent();
@@ -106,72 +137,19 @@ public class WallActivity extends Activity {
 
 		// Display the image
 		wallImage.setImageURI(imageUri);
-		// Set its touch listener
 		wallImage.setOnTouchListener(onTouchListener);
 
 		// Load the corresponding wall or create a new one		
 		wall = loadWall();
 		// Set the tags for the TaggeableImageView
 		((TaggeableImageView) wallImage).setTags((ArrayList<Tag>) wall.tags);
+		
+		lastTouchedTag = null;
 	}
 	
-	private OnTouchListener onTouchListener = new OnTouchListener(){
-		@Override
-		public boolean onTouch(View v, MotionEvent event)  {    
-			Log.v(TAG, "onTouch");
-		    
-			final int action = event.getAction();
-		    switch (action & MotionEvent.ACTION_MASK) {
-		       case MotionEvent.ACTION_DOWN: {
-		    	   int xPosition = (int) event.getX();
-		    	   int yPosition = (int) event.getY();
-		    	   Point touchedPoint = new Point(xPosition, yPosition);
-		    	   if(isThereATag(touchedPoint)){
-		    		   	// Move or change the size of the current Tag
-		    		   editTagOptionsList.setVisibility(View.VISIBLE);
-		    		   saveWall(wall);
-		    	   }else{
-		    		   	// Add a new Tag
-		    		   	Tag tag = new Tag("TagX", new Point(xPosition,yPosition));
-		   				wall.addTag(tag);
-		   				// Update the set of tags of the WallImage
-		   				((TaggeableImageView) wallImage).setTags((ArrayList<Tag>) wall.tags);
-		   				// Ask it to paint itself again
-		   				wallImage.invalidate();
-		    	   }
-		       break;
-		       }
-		    }
-		    return false;
-		}
-	};
-
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.wall, menu);
-		return true;
-	}
-
-	/**
-	 * Check if the touchedPoint is inside a Tag
-	 * @param touchedPoint the touched point
-	 * @return true if the touched point is inside a tag, false otherwise
-	 */
-	protected boolean isThereATag(Point touchedPoint) {
-		if(wall.tags != null){
-			// Iterate through the Tags list to see if the touched point is inside any of them
-			Iterator<Tag> tagsIterator = wall.tags.iterator();
-			while(tagsIterator.hasNext()){
-				Rect rect = tagsIterator.next().rect;
-				if(rect.contains(touchedPoint.x, touchedPoint.y)){
-					// TODO Return the id of the Tag
-					return true; 
-				}
-			}	
-		}
-		return false;
-	}
+	////////////////////////////////////////////////////////////////
+	// SAVE AND LOAD THE WALL
+	////////////////////////////////////////////////////////////////
 	
 	/**
 	 * Saves the current state of the wall in the shared preferences
@@ -206,6 +184,30 @@ public class WallActivity extends Activity {
 	    return wall;
 	}
 	
+	////////////////////////////////////////////////////////////////
+	// HELPER METHODS
+	////////////////////////////////////////////////////////////////
+	
+	/**
+	 * Check if the touchedPoint is inside a Tag
+	 * @param touchedPoint the touched point
+	 * @return true if the touched point is inside a tag, false otherwise
+	 */
+	protected Tag isThereATag(Point touchedPoint) {
+		if(wall.tags != null){
+			// Iterate through the Tags list to see if the touched point is inside any of them
+			Iterator<Tag> tagsIterator = wall.tags.iterator();
+			while(tagsIterator.hasNext()){
+				Tag tag = tagsIterator.next();
+				Rect rect = tag.rect;
+				if(rect.contains(touchedPoint.x, touchedPoint.y)){
+					return tag; 
+				}
+			}	
+		}
+		return null;
+	}
+	
 	/**
 	 * Computes the widest view in an adapter, best used when you need to wrap_content on a ListView, please be careful
 	 * and don't use it on an adapter that is extremely numerous in items or it will take a long time.
@@ -228,6 +230,215 @@ public class WallActivity extends Activity {
 	    }
 	    return maxWidth;
 	}	
+	
+	////////////////////////////////////////////////////////////////
+	// LISTENERS
+	////////////////////////////////////////////////////////////////
+	
+	/**
+	 * On touch listener. Controls the touched points to generate new tags and edit/delete existing ones.
+	 */
+	private OnTouchListener onTouchListener = new OnTouchListener(){
+		@Override
+		public boolean onTouch(View v, MotionEvent event)  {    
+			Log.v(TAG, "onTouch");
+		    
+			final int action = event.getAction();
+			
+			// To add new tags
+			if(!editTagsMode){		
+				switch (action & MotionEvent.ACTION_MASK) {
+			       case MotionEvent.ACTION_DOWN: {
+			    	   int xPosition = (int) event.getX();
+			    	   int yPosition = (int) event.getY();
+			    	   Point touchedPoint = new Point(xPosition, yPosition);
+			    	   if(isThereATag(touchedPoint) == null){
+			    		   // Add a new Tag
+			    		   Tag tag = new Tag("TagX", new Point(xPosition,yPosition));
+			   			   wall.addTag(tag);
+			   			   // Update the set of tags of the WallImage
+			   			   ((TaggeableImageView) wallImage).setTags((ArrayList<Tag>) wall.tags);
+			   			   // Ask it to paint itself again
+			   			   wallImage.invalidate();
+			    	   }
+			       break;
+			       }
+			    }	
+			// To edit already existing tags
+			}else{
+				switch (action & MotionEvent.ACTION_MASK) {
+			       case MotionEvent.ACTION_DOWN: {
+			    	   int xPosition = (int) event.getX();
+			    	   int yPosition = (int) event.getY();
+			    	   Point touchedPoint = new Point(xPosition, yPosition);
+			    	   Tag touchedTag = isThereATag(touchedPoint);
+			    	   if(touchedTag != null){
+			    		   	// Move or change the size of the current Tag
+			    		   lastTouchedTag = touchedTag;
+			    		   editTagOptionsList.setVisibility(View.VISIBLE);
+			    		   saveWall(wall);
+			    	   }
+			       break;
+			       }
+			    }	
+			}
+		    return false;
+		}
+	};
+
+	/**
+	 * Listener for the state of the Switch
+	 */
+	OnCheckedChangeListener checkListener = new OnCheckedChangeListener(){
+
+		@Override
+		public void onCheckedChanged(CompoundButton arg0, boolean arg1) {
+			editTagOptionsList.setVisibility(View.INVISIBLE);
+			editTagsMode = arg1;			
+		}
+		
+	};
+	
+	/**
+	 * Listener for the items of the List
+	 */
+	OnItemClickListener listItemListener = new OnItemClickListener() {
+
+		@Override
+		public void onItemClick(AdapterView<?> parent, View view, int position,	long id) {
+			switch (position) {
+		       case 0: {
+		    	   // Add or edit tags name
+		    	   Log.d(TAG,"Add or edit the name of the tag");
+		    	   // TODO Pass the current name of the tag to the dialog
+		    	   showNoticeDialog();
+		       break;
+		       }case 1: {
+		    	   // Add or edit the data associated to the tag
+		    	   Log.d(TAG,"Add or edit the data of the tag");
+		    	   break;
+		       }case 2: {
+		    	   // Move the tag
+		    	   Log.d(TAG,"Move the tag");
+		    	   break;
+		       }case 3: {
+		    	   // Delete the tag
+		    	   Log.d(TAG, "Delete the tag");
+	   				wall.removeTag(lastTouchedTag);
+	   				// Update the set of tags of the WallImage
+	   				((TaggeableImageView) wallImage).setTags((ArrayList<Tag>) wall.tags);
+	   				// Ask it to paint itself again
+	   				wallImage.invalidate();
+		    	   break;
+		       }case 4: {
+		    	   // Change the size of the tag
+		    	   Log.d(TAG,"Change the size of the tag");
+		    	   break;
+		       }
+		    }
+			editTagOptionsList.setVisibility(View.INVISIBLE);
+		}
+	};
+	
+	////////////////////////////////////////////////////////////////
+	// METHODS FOR THE NOTICE DIALOG LISTENER
+	////////////////////////////////////////////////////////////////
+	
+	
+	public void showNoticeDialog() {
+        // Create an instance of the dialog fragment and show it
+        DialogFragment dialog = new NoticeDialogFragment();
+        ((NoticeDialogFragment) dialog).setName(lastTouchedTag.name);
+        dialog.show(getFragmentManager(), "NoticeDialogFragment");
+    }
+
+    // The dialog fragment receives a reference to this Activity through the
+    // Fragment.onAttach() callback, which it uses to call the following methods
+    // defined by the NoticeDialogFragment.NoticeDialogListener interface
+    @Override
+    public void onDialogPositiveClick(DialogFragment dialog) {
+        // User touched the dialog's positive button
+        EditText newName = (EditText)dialog.getDialog().findViewById(R.id.editText);
+        lastTouchedTag.setName(newName.getText().toString());
+ 	   	// Ask it to paint itself again
+        wallImage.invalidate();
+    }
+
+    @Override
+    public void onDialogNegativeClick(DialogFragment dialog) {
+        // User touched the dialog's negative button
+    }
+    
+    
+    
+    
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// Inflate the menu; this adds items to the action bar if it is present.
+		getMenuInflater().inflate(R.menu.wall, menu);
+		return true;
+	}
+
+	
+	//private String showTagNamePopup() {
+		/*
+		// 1. Instantiate an AlertDialog.Builder with its constructor
+		AlertDialog.Builder builder = new AlertDialog.Builder(context);
+		// 2. Chain together various setter methods to set the dialog characteristics
+		builder.setMessage(R.string.change_name_popup).setTitle(R.string.dialog_title);
+		
+		// Add the buttons
+		builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+		           public void onClick(DialogInterface dialog, int id) {
+		               // User clicked OK button
+		           }
+		       });
+		builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+		           public void onClick(DialogInterface dialog, int id) {
+		               // User cancelled the dialog
+		           }
+		       });
+
+		
+		// 3. Get the AlertDialog from create()
+		AlertDialog dialog = builder.create();
+		*/
+		
+		
+		/* Inflate the popup_layout.xml
+		LinearLayout viewGroup = (LinearLayout) findViewById(R.id.popup);
+		LayoutInflater layoutInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+		View layout = layoutInflater.inflate(R.layout.change_name_popup, viewGroup);
+		
+		
+		final PopupWindow popup = new PopupWindow();
+		popup.setWidth(200);
+		popup.setHeight(150);
+		popup.setFocusable(true);
+		popup.setBackgroundDrawable(null);
+		popup.showAtLocation(wallImage, Gravity.CENTER, 0, 0);
+		// Getting a reference to Close button, and close the popup when clicked.
+		Button close = (Button) layout.findViewById(R.id.cancelButton);
+		close.setOnClickListener(new OnClickListener() {
+		 
+			@Override
+		    public void onClick(View v) {			
+				popup.dismiss();
+		    }
+		});
+		final EditText editText = (EditText)layout.findViewById(R.id.editText);
+		Button accept = (Button) layout.findViewById(R.id.okButton);
+		String newName = "";
+		accept.setOnClickListener(new OnClickListener(){
+			@Override
+		    public void onClick(View v) {
+				Log.d(TAG, editText.getText().toString());
+				popup.dismiss();
+		    }
+		});
+		return newName;
+		*/
+	
 	
 	/*
 	private OnLongClickListener longListener = new OnLongClickListener(){
